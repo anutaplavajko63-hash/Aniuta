@@ -1,0 +1,568 @@
+﻿using System;
+using System.Globalization;
+using System.Text;
+
+class Program
+{
+    static void Main()
+    {
+        Console.OutputEncoding = Encoding.UTF8;
+        Console.InputEncoding = Encoding.UTF8;
+
+        const int Capacity = 100;
+
+        // Довідник: Статус
+        int[] statusCodes = new int[Capacity];
+        string[] statusNames = new string[Capacity];
+        bool[] statusIsActive = new bool[Capacity];
+        int statusCount = 0;
+
+        // Сутність: Користувач
+        string[] users = new string[Capacity];
+        int userCount = 0;
+
+        // Сутність: Замовлення (усі 9 полів за варіантом 20)
+        int[] orderIds = new int[Capacity];
+        string[] clients = new string[Capacity];
+        string[] addresses = new string[Capacity];
+        string[] orderContents = new string[Capacity];
+        double[] amounts = new double[Capacity];
+        string[] couriers = new string[Capacity];
+        string[] acceptedTimes = new string[Capacity];
+        string[] deliveredTimes = new string[Capacity];
+        int[] orderStatusCodes = new int[Capacity];
+        int orderCount = 0;
+
+        // Заповнення початковими даними (передача лічильників через ref)
+        InitData(
+            statusCodes, statusNames, statusIsActive, ref statusCount,
+            users, ref userCount,
+            orderIds, clients, addresses, orderContents, amounts, couriers,
+            acceptedTimes, deliveredTimes, orderStatusCodes, ref orderCount);
+
+        bool isRunning = true;
+        while (isRunning)
+        {
+            PrintMenu();
+            int choice = ReadInt("Оберіть дію: ");
+
+            switch (choice)
+            {
+                case 1:
+                    PrintOrders(
+                        statusCodes, statusNames, statusCount,
+                        orderIds, clients, addresses, orderContents, amounts, couriers,
+                        acceptedTimes, deliveredTimes, orderStatusCodes, orderCount);
+                    break;
+                case 2:
+                    AddOrder(
+                        statusCodes, statusNames, statusIsActive, statusCount,
+                        users, ref userCount,
+                        orderIds, clients, addresses, orderContents, amounts, couriers,
+                        acceptedTimes, deliveredTimes, orderStatusCodes, ref orderCount,
+                        Capacity);
+                    break;
+                case 3:
+                    SearchOrders(
+                        statusCodes, statusNames, statusCount,
+                        orderIds, clients, addresses, orderContents, amounts, couriers,
+                        acceptedTimes, deliveredTimes, orderStatusCodes, orderCount);
+                    break;
+                case 4:
+                    EditOrderStatus(
+                        statusCodes, statusNames, statusIsActive, statusCount,
+                        orderIds, orderStatusCodes, orderCount);
+                    break;
+                case 5:
+                    DeleteOrder(
+                        orderIds, clients, addresses, orderContents, amounts, couriers,
+                        acceptedTimes, deliveredTimes, orderStatusCodes, ref orderCount);
+                    break;
+                case 6:
+                    PrintCourierSummary(couriers, acceptedTimes, deliveredTimes, orderCount, Capacity);
+                    break;
+                case 7:
+                    ManageStatuses(statusCodes, statusNames, statusIsActive, ref statusCount, Capacity);
+                    break;
+                case 8:
+                    PrintUsers(users, userCount);
+                    break;
+                case 0:
+                    isRunning = false;
+                    Console.WriteLine("Роботу завершено.");
+                    break;
+                default:
+                    Console.WriteLine("Невідомий пункт меню.");
+                    break;
+            }
+        }
+    }
+
+    static void PrintMenu()
+    {
+        Console.WriteLine("\n=== ДОСТАВКА ЇЖІ (Варіант 20) ===");
+        Console.WriteLine("1. Показати всі замовлення");
+        Console.WriteLine("2. Додати замовлення");
+        Console.WriteLine("3. Знайти замовлення");
+        Console.WriteLine("4. Змінити статус замовлення");
+        Console.WriteLine("5. Видалити замовлення");
+        Console.WriteLine("6. Підсумок: середній час доставки по кожному кур'єру");
+        Console.WriteLine("7. Довідник статусів");
+        Console.WriteLine("8. Список користувачів");
+        Console.WriteLine("0. Вихід");
+    }
+
+    static void InitData(
+        int[] statusCodes, string[] statusNames, bool[] statusIsActive, ref int statusCount,
+        string[] users, ref int userCount,
+        int[] orderIds, string[] clients, string[] addresses, string[] orderContents,
+        double[] amounts, string[] couriers, string[] acceptedTimes, string[] deliveredTimes,
+        int[] orderStatusCodes, ref int orderCount)
+    {
+        statusCodes[0] = 1; statusNames[0] = "Прийнято"; statusIsActive[0] = true;
+        statusCodes[1] = 2; statusNames[1] = "Готується"; statusIsActive[1] = true;
+        statusCodes[2] = 3; statusNames[2] = "У дорозі"; statusIsActive[2] = true;
+        statusCodes[3] = 4; statusNames[3] = "Доставлено"; statusIsActive[3] = true;
+        statusCodes[4] = 5; statusNames[4] = "Скасовано"; statusIsActive[4] = false;
+        statusCount = 5;
+
+        orderIds[0] = 1;
+        clients[0] = "Коваленко Іван";
+        addresses[0] = "вул. Корзо, 12";
+        orderContents[0] = "Піца Маргарита, Кола";
+        amounts[0] = 320.50;
+        couriers[0] = "Бондаренко Олег";
+        acceptedTimes[0] = "12:10";
+        deliveredTimes[0] = "12:45"; // 35 хв
+        orderStatusCodes[0] = 4;
+        AddUserIfUnique(users, ref userCount, clients[0], users.Length);
+
+        orderIds[1] = 2;
+        clients[1] = "Мельник Оксана";
+        addresses[1] = "пр. Свободи, 45";
+        orderContents[1] = "Сет Філадельфія";
+        amounts[1] = 680.00;
+        couriers[1] = "Бондаренко Олег";
+        acceptedTimes[1] = "13:00";
+        deliveredTimes[1] = "13:55"; // 55 хв (середнє = 45.0 хв)
+        orderStatusCodes[1] = 4;
+        AddUserIfUnique(users, ref userCount, clients[1], users.Length);
+
+        orderIds[2] = 3;
+        clients[2] = "Ткачук Андрій";
+        addresses[2] = "вул. Минайська, 8";
+        orderContents[2] = "Бургер меню";
+        amounts[2] = 410.00;
+        couriers[2] = "Шевченко Тарас";
+        acceptedTimes[2] = "14:15";
+        deliveredTimes[2] = "14:40"; // 25 хв
+        orderStatusCodes[2] = 4;
+        AddUserIfUnique(users, ref userCount, clients[2], users.Length);
+
+        orderCount = 3;
+    }
+
+    // --- КОРИСТУВАЧІ ---
+    static void AddUserIfUnique(string[] users, ref int userCount, string clientName, int capacity)
+    {
+        for (int i = 0; i < userCount; i++)
+        {
+            if (string.Equals(users[i].Trim(), clientName.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+        }
+
+        if (userCount < capacity)
+        {
+            users[userCount] = clientName.Trim();
+            userCount++; // зміна оригіналу через ref
+        }
+    }
+
+    static void PrintUsers(string[] users, int userCount)
+    {
+        Console.WriteLine("\n--- Користувачі ---");
+        if (userCount == 0)
+        {
+            Console.WriteLine("Список користувачів порожній.");
+            return;
+        }
+
+        for (int i = 0; i < userCount; i++)
+        {
+            Console.WriteLine($"{i + 1}. {users[i]}");
+        }
+    }
+
+    // --- ДОВІДНИК СТАТУСІВ ---
+    static void ManageStatuses(
+        int[] statusCodes, string[] statusNames, bool[] statusIsActive, ref int statusCount, int capacity)
+    {
+        Console.WriteLine("\n--- Довідник статусів ---");
+        PrintStatuses(statusCodes, statusNames, statusIsActive, statusCount, false);
+        Console.WriteLine("\n1. Додати новий статус");
+        Console.WriteLine("2. Увімкнути / вимкнути статус");
+        Console.WriteLine("0. Назад");
+
+        int action = ReadInt("Оберіть дію: ");
+        if (action == 1)
+        {
+            if (statusCount >= capacity)
+            {
+                Console.WriteLine("Довідник заповнений.");
+                return;
+            }
+            string name = ReadNonEmptyString("Назва статусу: ");
+            int newCode = (statusCount == 0) ? 1 : statusCodes[statusCount - 1] + 1;
+            statusCodes[statusCount] = newCode;
+            statusNames[statusCount] = name;
+            statusIsActive[statusCount] = true;
+            statusCount++; // зміна оригіналу через ref
+            Console.WriteLine($"Додано статус «{name}» з кодом {newCode}.");
+        }
+        else if (action == 2)
+        {
+            int code = ReadInt("Введіть код статусу: ");
+            int idx = FindStatusIndex(statusCodes, statusCount, code);
+            if (idx == -1)
+            {
+                Console.WriteLine("Статус не знайдено.");
+            }
+            else
+            {
+                statusIsActive[idx] = !statusIsActive[idx];
+                Console.WriteLine($"Статус «{statusNames[idx]}» тепер {(statusIsActive[idx] ? "активний" : "вимкнений")}.");
+            }
+        }
+    }
+
+    static void PrintStatuses(int[] statusCodes, string[] statusNames, bool[] statusIsActive, int statusCount, bool onlyActive)
+    {
+        for (int i = 0; i < statusCount; i++)
+        {
+            if (onlyActive && !statusIsActive[i]) continue;
+            Console.WriteLine($"Код: {statusCodes[i]} | {statusNames[i]} ({(statusIsActive[i] ? "активний" : "вимкнений")})");
+        }
+    }
+
+    static int FindStatusIndex(int[] statusCodes, int statusCount, int code)
+    {
+        for (int i = 0; i < statusCount; i++)
+        {
+            if (statusCodes[i] == code) return i;
+        }
+        return -1;
+    }
+
+    static string GetStatusName(int[] statusCodes, string[] statusNames, int statusCount, int code)
+    {
+        int idx = FindStatusIndex(statusCodes, statusCount, code);
+        return idx != -1 ? statusNames[idx] : "Невідомий";
+    }
+
+    // --- ЗАМОВЛЕННЯ (CRUD) ---
+    static void PrintOrders(
+        int[] statusCodes, string[] statusNames, int statusCount,
+        int[] orderIds, string[] clients, string[] addresses, string[] orderContents,
+        double[] amounts, string[] couriers, string[] acceptedTimes, string[] deliveredTimes,
+        int[] orderStatusCodes, int orderCount)
+    {
+        Console.WriteLine("\n--- Усі замовлення ---");
+        if (orderCount == 0)
+        {
+            Console.WriteLine("Замовлень немає.");
+            return;
+        }
+
+        for (int i = 0; i < orderCount; i++)
+        {
+            string stName = GetStatusName(statusCodes, statusNames, statusCount, orderStatusCodes[i]);
+            Console.WriteLine(
+                $"№{orderIds[i]} | Клієнт: {clients[i]} | Адреса: {addresses[i]} | Склад: {orderContents[i]} | " +
+                $"Сума: {amounts[i]:F2} грн | Кур'єр: {couriers[i]} | Прийнято: {acceptedTimes[i]} | " +
+                $"Доставлено: {deliveredTimes[i]} | Статус: {stName} (код {orderStatusCodes[i]})");
+        }
+    }
+
+    static void AddOrder(
+        int[] statusCodes, string[] statusNames, bool[] statusIsActive, int statusCount,
+        string[] users, ref int userCount,
+        int[] orderIds, string[] clients, string[] addresses, string[] orderContents,
+        double[] amounts, string[] couriers, string[] acceptedTimes, string[] deliveredTimes,
+        int[] orderStatusCodes, ref int orderCount,
+        int capacity)
+    {
+        if (orderCount >= capacity)
+        {
+            Console.WriteLine("Досягнуто максимум замовлень.");
+            return;
+        }
+
+        string client = ReadNonEmptyString("Клієнт: ");
+        string address = ReadNonEmptyString("Адреса: ");
+        string content = ReadNonEmptyString("Склад замовлення: ");
+        double amount = ReadPositiveDouble("Сума (грн): ");
+        string courier = ReadNonEmptyString("Кур'єр: ");
+
+        string accTime = ReadTime("Час прийняття (HH:mm): ", out int accMin);
+        string delTime;
+        while (true)
+        {
+            delTime = ReadTime("Час доставки (HH:mm): ", out int delMin);
+            if (delMin >= accMin) break;
+            Console.WriteLine("Час доставки не може бути раніше часу прийняття.");
+        }
+
+        Console.WriteLine("Доступні статуси:");
+        PrintStatuses(statusCodes, statusNames, statusIsActive, statusCount, true);
+
+        int stCode;
+        while (true)
+        {
+            stCode = ReadInt("Код статусу: ");
+            int idx = FindStatusIndex(statusCodes, statusCount, stCode);
+            if (idx != -1 && statusIsActive[idx]) break;
+            Console.WriteLine("Невірний або вимкнений код статусу.");
+        }
+
+        int newId = (orderCount == 0) ? 1 : orderIds[orderCount - 1] + 1;
+
+        orderIds[orderCount] = newId;
+        clients[orderCount] = client;
+        addresses[orderCount] = address;
+        orderContents[orderCount] = content;
+        amounts[orderCount] = amount;
+        couriers[orderCount] = courier;
+        acceptedTimes[orderCount] = accTime;
+        deliveredTimes[orderCount] = delTime;
+        orderStatusCodes[orderCount] = stCode;
+
+        orderCount++; // зміна оригіналу через ref
+        AddUserIfUnique(users, ref userCount, client, capacity);
+
+        Console.WriteLine($"Замовлення №{newId} додано.");
+    }
+
+    static void SearchOrders(
+        int[] statusCodes, string[] statusNames, int statusCount,
+        int[] orderIds, string[] clients, string[] addresses, string[] orderContents,
+        double[] amounts, string[] couriers, string[] acceptedTimes, string[] deliveredTimes,
+        int[] orderStatusCodes, int orderCount)
+    {
+        string query = ReadNonEmptyString("Введіть текст для пошуку (клієнт, адреса або кур'єр): ").ToLower();
+        int found = 0;
+
+        for (int i = 0; i < orderCount; i++)
+        {
+            if (clients[i].ToLower().Contains(query) ||
+                addresses[i].ToLower().Contains(query) ||
+                couriers[i].ToLower().Contains(query))
+            {
+                string stName = GetStatusName(statusCodes, statusNames, statusCount, orderStatusCodes[i]);
+                Console.WriteLine($"№{orderIds[i]} | {clients[i]} | {addresses[i]} | {amounts[i]:F2} грн | Кур'єр: {couriers[i]} | {stName}");
+                found++;
+            }
+        }
+
+        if (found == 0) Console.WriteLine("Нічого не знайдено.");
+    }
+
+    static void EditOrderStatus(
+        int[] statusCodes, string[] statusNames, bool[] statusIsActive, int statusCount,
+        int[] orderIds, int[] orderStatusCodes, int orderCount)
+    {
+        int id = ReadInt("Введіть номер замовлення: ");
+        for (int i = 0; i < orderCount; i++)
+        {
+            if (orderIds[i] == id)
+            {
+                PrintStatuses(statusCodes, statusNames, statusIsActive, statusCount, true);
+                int newCode = ReadInt("Новий код статусу: ");
+                int idx = FindStatusIndex(statusCodes, statusCount, newCode);
+                if (idx != -1 && statusIsActive[idx])
+                {
+                    orderStatusCodes[i] = newCode; // зміна елемента масиву видна ззовні
+                    Console.WriteLine("Статус оновлено.");
+                }
+                else
+                {
+                    Console.WriteLine("Невірний або вимкнений статус.");
+                }
+                return;
+            }
+        }
+        Console.WriteLine("Замовлення не знайдено.");
+    }
+
+    static void DeleteOrder(
+        int[] orderIds, string[] clients, string[] addresses, string[] orderContents,
+        double[] amounts, string[] couriers, string[] acceptedTimes, string[] deliveredTimes,
+        int[] orderStatusCodes, ref int orderCount)
+    {
+        int id = ReadInt("Введіть номер замовлення для видалення: ");
+        int index = -1;
+
+        for (int i = 0; i < orderCount; i++)
+        {
+            if (orderIds[i] == id)
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (index == -1)
+        {
+            Console.WriteLine("Замовлення не знайдено.");
+            return;
+        }
+
+        for (int i = index; i < orderCount - 1; i++)
+        {
+            orderIds[i] = orderIds[i + 1];
+            clients[i] = clients[i + 1];
+            addresses[i] = addresses[i + 1];
+            orderContents[i] = orderContents[i + 1];
+            amounts[i] = amounts[i + 1];
+            couriers[i] = couriers[i + 1];
+            acceptedTimes[i] = acceptedTimes[i + 1];
+            deliveredTimes[i] = deliveredTimes[i + 1];
+            orderStatusCodes[i] = orderStatusCodes[i + 1];
+        }
+
+        orderCount--; // зміна оригіналу через ref
+        Console.WriteLine($"Замовлення №{id} видалено.");
+    }
+
+    // --- ПІДСУМКОВА ВЕЛИЧИНА (out + масиви фіксованої довжини) ---
+    static void CalculateCourierAverageTimes(
+        string[] couriers, string[] acceptedTimes, string[] deliveredTimes, int orderCount,
+        string[] uniqueCouriers, double[] averageMinutes, int[] counts, out int uniqueCount)
+    {
+        uniqueCount = 0;
+        int[] sumMinutes = new int[uniqueCouriers.Length];
+
+        for (int i = 0; i < orderCount; i++)
+        {
+            if (!TryParseTime(acceptedTimes[i], out int accMin) ||
+                !TryParseTime(deliveredTimes[i], out int delMin))
+            {
+                continue;
+            }
+
+            int diff = delMin - accMin;
+            if (diff < 0) diff = 0;
+
+            int foundIdx = -1;
+            for (int j = 0; j < uniqueCount; j++)
+            {
+                if (string.Equals(uniqueCouriers[j], couriers[i], StringComparison.OrdinalIgnoreCase))
+                {
+                    foundIdx = j;
+                    break;
+                }
+            }
+
+            if (foundIdx == -1)
+            {
+                uniqueCouriers[uniqueCount] = couriers[i];
+                sumMinutes[uniqueCount] = diff;
+                counts[uniqueCount] = 1;
+                uniqueCount++;
+            }
+            else
+            {
+                sumMinutes[foundIdx] += diff;
+                counts[foundIdx]++;
+            }
+        }
+
+        for (int i = 0; i < uniqueCount; i++)
+        {
+            averageMinutes[i] = (double)sumMinutes[i] / counts[i];
+        }
+    }
+
+    static void PrintCourierSummary(
+        string[] couriers, string[] acceptedTimes, string[] deliveredTimes, int orderCount, int capacity)
+    {
+        Console.WriteLine("\n--- Середній час доставки по кожному кур'єру ---");
+        if (orderCount == 0)
+        {
+            Console.WriteLine("Немає даних для розрахунку.");
+            return;
+        }
+
+        string[] uniqueCouriers = new string[capacity];
+        double[] averageMinutes = new double[capacity];
+        int[] counts = new int[capacity];
+
+        CalculateCourierAverageTimes(
+            couriers, acceptedTimes, deliveredTimes, orderCount,
+            uniqueCouriers, averageMinutes, counts, out int uniqueCount);
+
+        for (int i = 0; i < uniqueCount; i++)
+        {
+            Console.WriteLine($"Кур'єр: {uniqueCouriers[i]} | Доставок: {counts[i]} | Середній час: {averageMinutes[i]:F1} хв");
+        }
+    }
+
+    // --- ДОПОМІЖНІ МЕТОДИ ВВЕДЕННЯ ---
+    static int ReadInt(string prompt)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            if (int.TryParse(Console.ReadLine(), out int val)) return val;
+            Console.WriteLine("Введіть ціле число.");
+        }
+    }
+
+    static double ReadPositiveDouble(string prompt)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            string input = Console.ReadLine()?.Replace(',', '.');
+            if (double.TryParse(input, NumberStyles.Any, CultureInfo.InvariantCulture, out double val) && val > 0)
+            {
+                return val;
+            }
+            Console.WriteLine("Введіть додатне число.");
+        }
+    }
+
+    static string ReadNonEmptyString(string prompt)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            string s = Console.ReadLine()?.Trim();
+            if (!string.IsNullOrEmpty(s)) return s;
+            Console.WriteLine("Рядок не може бути порожнім.");
+        }
+    }
+
+    static string ReadTime(string prompt, out int totalMinutes)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            string s = Console.ReadLine()?.Trim();
+            if (TryParseTime(s, out totalMinutes)) return s;
+            Console.WriteLine("Введіть час у форматі HH:mm (наприклад, 14:30).");
+        }
+    }
+
+    static bool TryParseTime(string timeStr, out int totalMinutes)
+    {
+        totalMinutes = 0;
+        if (DateTime.TryParseExact(timeStr, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dt))
+        {
+            totalMinutes = dt.Hour * 60 + dt.Minute;
+            return true;
+        }
+        return false;
+    }
+}
