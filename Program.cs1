@@ -1,0 +1,311 @@
+using System;
+using System.Globalization;
+
+class Program
+{
+    const int Capacity = 100;
+
+    // Паралельні масиви: елементи з однаковим індексом утворюють одне замовлення.
+    static int[] numbers = new int[Capacity];
+    static string[] clients = new string[Capacity];
+    static string[] addresses = new string[Capacity];
+    static string[] contents = new string[Capacity];
+    static double[] sums = new double[Capacity];
+    static string[] couriers = new string[Capacity];
+    static string[] acceptedTimes = new string[Capacity];
+    static string[] deliveredTimes = new string[Capacity];
+    static int[] statusCodes = new int[Capacity];
+
+    static int count = 0;
+    static int nextId = 1;
+
+    static readonly CultureInfo UaCulture = CultureInfo.GetCultureInfo("uk-UA");
+    const string DateFormat = "dd.MM.yyyy HH:mm";
+
+    static void Main()
+    {
+        while (true)
+        {
+            Console.WriteLine("\n========== ДОСТАВКА ЇЖІ ==========");
+            Console.WriteLine("1. Показати всі замовлення");
+            Console.WriteLine("2. Додати замовлення");
+            Console.WriteLine("3. Заповнити тестовими даними");
+            Console.WriteLine("4. Середній час доставки за кур'єрами");
+            Console.WriteLine("0. Вихід");
+
+            int choice = ReadInt("Ваш вибір: ", 0, 4);
+
+            switch (choice)
+            {
+                case 1:
+                    ShowOrders();
+                    break;
+                case 2:
+                    AddOrder();
+                    break;
+                case 3:
+                    FillTestData();
+                    break;
+                case 4:
+                    ShowAverageDeliveryTimeByCourier();
+                    break;
+                case 0:
+                    Console.WriteLine("Роботу програми завершено.");
+                    return;
+            }
+        }
+    }
+
+    // Безпечне введення цілого числа в заданих межах.
+    static int ReadInt(string prompt, int min, int max)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            string input = Console.ReadLine() ?? "";
+
+            if (int.TryParse(input, out int value) && value >= min && value <= max)
+                return value;
+
+            Console.WriteLine($"Введіть ціле число від {min} до {max}.");
+        }
+    }
+
+    
+    static string ReadText(string prompt)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            string value = (Console.ReadLine() ?? "").Trim();
+
+            if (value.Length > 0)
+                return value;
+
+            Console.WriteLine("Поле не може бути порожнім.");
+        }
+    }
+
+    // Перевірка суми замовлення.
+    static double ReadDouble(string prompt, double min, double max)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            string input = (Console.ReadLine() ?? "").Trim().Replace(',', '.');
+
+            if (double.TryParse(input, NumberStyles.Number,
+                CultureInfo.InvariantCulture, out double value)
+                && value >= min && value <= max)
+                return value;
+
+            Console.WriteLine($"Введіть число від {min} до {max}.");
+        }
+    }
+
+    // Час зберігається у форматі рядка, як зазначено в умові.
+    static string ReadDateTime(string prompt)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            string input = (Console.ReadLine() ?? "").Trim();
+
+            if (DateTime.TryParseExact(input, DateFormat, UaCulture,
+                DateTimeStyles.None, out DateTime value))
+                return value.ToString(DateFormat);
+
+            Console.WriteLine("Неправильний формат. Приклад: 19.11.2026 14:30");
+        }
+    }
+
+    static DateTime ParseStoredDateTime(string value)
+    {
+        return DateTime.ParseExact(value, DateFormat, UaCulture);
+    }
+
+    // Додавання одного замовлення.
+    static void AddOrder()
+    {
+        if (count == Capacity)
+        {
+            Console.WriteLine("Сховище заповнене. Нове замовлення додати неможливо.");
+            return;
+        }
+
+        Console.WriteLine("\n--- Нове замовлення ---");
+        string client = ReadText("Клієнт: ");
+        string address = ReadText("Адреса доставки: ");
+        string content = ReadText("Склад замовлення: ");
+        double sum = ReadDouble("Сума (грн): ", 0.01, 1000000);
+        string courier = ReadText("Кур'єр: ");
+        string accepted = ReadDateTime("Час прийняття (дд.мм.рррр гг:хх): ");
+        string delivered = ReadDateTime("Час доставки (дд.мм.рррр гг:хх): ");
+
+        DateTime acceptedDate = ParseStoredDateTime(accepted);
+        DateTime deliveredDate = ParseStoredDateTime(delivered);
+
+        while (deliveredDate < acceptedDate)
+        {
+            Console.WriteLine("Час доставки не може бути раніше часу прийняття.");
+            delivered = ReadDateTime("Введіть час доставки ще раз: ");
+            deliveredDate = ParseStoredDateTime(delivered);
+        }
+
+        int status = ReadInt("Код статусу (1 — прийнято, 2 — готується, 3 — у дорозі, 4 — доставлено): ", 1, 4);
+
+        // Усі значення зібрані до запису, тому масиви залишаються синхронізованими.
+        numbers[count] = nextId;
+        clients[count] = client;
+        addresses[count] = address;
+        contents[count] = content;
+        sums[count] = sum;
+        couriers[count] = courier;
+        acceptedTimes[count] = accepted;
+        deliveredTimes[count] = delivered;
+        statusCodes[count] = status;
+
+        count++;
+        nextId++;
+
+        Console.WriteLine($"Замовлення №{numbers[count - 1]} додано.");
+    }
+
+    // Виведення всіх записів у вигляді таблиці.
+    static void ShowOrders()
+    {
+        if (count == 0)
+        {
+            Console.WriteLine("Замовлень поки немає.");
+            return;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"{"№",3} {"Клієнт",-14} {"Адреса",-20} {"Склад замовлення",-22} {"Сума",9} {"Кур'єр",-14} {"Прийнято",-17} {"Доставлено",-17} {"Статус",7}");
+        Console.WriteLine(new string('-', 150));
+
+        for (int i = 0; i < count; i++)
+        {
+            Console.WriteLine($"{numbers[i],3} {Shorten(clients[i], 14),-14} {Shorten(addresses[i], 20),-20} " +
+                $"{Shorten(contents[i], 22),-22} {sums[i],9:F2} {Shorten(couriers[i], 14),-14} " +
+                $"{acceptedTimes[i],-17} {deliveredTimes[i],-17} {statusCodes[i],7}");
+        }
+
+        Console.WriteLine($"\nКількість замовлень: {count}.");
+    }
+
+    // Допоміжне скорочення довгих значень для акуратного вигляду таблиці.
+    static string Shorten(string value, int maxLength)
+    {
+        if (value.Length <= maxLength)
+            return value;
+
+        return value.Substring(0, maxLength - 3) + "...";
+    }
+
+    // Додавання шести прикладів без введення з клавіатури.
+    static void FillTestData()
+    {
+        if (count == Capacity)
+        {
+            Console.WriteLine("Сховище заповнене.");
+            return;
+        }
+
+        string[] testClients = { "Олена", "Максим", "Ірина", "Андрій", "Марія", "Денис" };
+        string[] testAddresses = {
+            "вул. Шевченка, 10", "вул. Миру, 5", "пл. Театральна, 2",
+            "вул. Собранецька, 18", "вул. Капушанська, 30", "вул. Легоцького, 7"
+        };
+        string[] testContents = {
+            "Піца, сік", "Бургер, картопля", "Суші, вода",
+            "Паста, салат", "Піца, десерт", "Салат, чай"
+        };
+        double[] testSums = { 320, 245, 410, 280, 360, 190 };
+        string[] testCouriers = { "Іван", "Петро", "Іван", "Олег", "Петро", "Іван" };
+        string[] testAccepted = {
+            "19.11.2026 12:00", "19.11.2026 12:10", "19.11.2026 12:20",
+            "19.11.2026 12:30", "19.11.2026 12:40", "19.11.2026 12:50"
+        };
+        string[] testDelivered = {
+            "19.11.2026 12:35", "19.11.2026 12:55", "19.11.2026 13:05",
+            "19.11.2026 13:10", "19.11.2026 13:20", "19.11.2026 13:30"
+        };
+        int[] testStatuses = { 4, 4, 4, 4, 4, 4 };
+
+        int added = 0;
+        for (int i = 0; i < testClients.Length && count < Capacity; i++)
+        {
+            numbers[count] = nextId;
+            clients[count] = testClients[i];
+            addresses[count] = testAddresses[i];
+            contents[count] = testContents[i];
+            sums[count] = testSums[i];
+            couriers[count] = testCouriers[i];
+            acceptedTimes[count] = testAccepted[i];
+            deliveredTimes[count] = testDelivered[i];
+            statusCodes[count] = testStatuses[i];
+
+            count++;
+            nextId++;
+            added++;
+        }
+
+        Console.WriteLine($"Додано тестових замовлень: {added}.");
+    }
+
+    // Підсумкова величина: середній час доставки окремо для кожного кур'єра.
+    // Повторні імена кур'єрів пропускаються, щоб кожен виводився один раз.
+    static void ShowAverageDeliveryTimeByCourier()
+    {
+        if (count == 0)
+        {
+            Console.WriteLine("Немає даних для обчислення середнього часу доставки.");
+            return;
+        }
+
+        Console.WriteLine("\n--- Середній час доставки за кур'єрами ---");
+
+        for (int i = 0; i < count; i++)
+        {
+            bool alreadyShown = false;
+
+            for (int k = 0; k < i; k++)
+            {
+                if (string.Equals(couriers[k], couriers[i],
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    alreadyShown = true;
+                    break;
+                }
+            }
+
+            if (alreadyShown)
+                continue;
+
+            double totalMinutes = 0;
+            int courierOrders = 0;
+
+            for (int j = 0; j < count; j++)
+            {
+                if (string.Equals(couriers[j], couriers[i],
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    DateTime accepted = ParseStoredDateTime(acceptedTimes[j]);
+                    DateTime delivered = ParseStoredDateTime(deliveredTimes[j]);
+
+                    totalMinutes += (delivered - accepted).TotalMinutes;
+                    courierOrders++;
+                }
+            }
+
+            if (courierOrders > 0)
+            {
+                double averageMinutes = totalMinutes / courierOrders;
+                TimeSpan average = TimeSpan.FromMinutes(averageMinutes);
+                Console.WriteLine($"{couriers[i]}: {average.TotalMinutes:F0} хв " +
+                    $"(замовлень: {courierOrders}).");
+            }
+        }
+    }
+}
